@@ -3,7 +3,7 @@
 Global illumination for Single Player Tarkov. TraceSix replaces Tarkov's flat ambient light with light that
 actually bounces: sunlight, skylight and lamp light bounce off surfaces and light the rooms and streets around
 them. With a GPU that supports it, it can also ray trace that light and the shadows against the map's real
-geometry. Works on flatscreen and in VR.
+geometry. Works on flatscreen and in VR. Ray tracing in VR is experimental and off by default and only supports GI.
 
 Support my work on Ko-fi: https://ko-fi.com/matsix
 
