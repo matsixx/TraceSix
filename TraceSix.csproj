@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>TraceSix</RootNamespace>
+    <AssemblyName>TraceSix</AssemblyName>
+    <Nullable>disable</Nullable>
+    <Authors>matsix</Authors>
+    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <Version>$(AssemblyVersion)</Version>
+    <Configurations>Debug;Release</Configurations>
+    <LangVersion>latest</LangVersion>
+    <Deterministic>true</Deterministic>
+    <!-- Also marks the assembly SkipVerification: Mono then lets it read the game's private members through the
+         publicized reference (without it: FieldAccessException at runtime, 0.24.158's every-frame errors). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+  </PropertyGroup>
+
+  <!-- References resolve from the local libs/ folder (DLLs copied from the game's Managed folder and
+       BepInEx/core). Assembly-CSharp is the publicized copy the other mods share (private members public). -->
+  <ItemGroup>
+    <Reference Include="BepInEx"><HintPath>libs\BepInEx.dll</HintPath></Reference>
+    <Reference Include="0Harmony"><HintPath>libs\0Harmony.dll</HintPath></Reference>
+    <Reference Include="spt-reflection"><HintPath>libs\spt-reflection.dll</HintPath></Reference>
+    <Reference Include="Assembly-CSharp"><HintPath>libs\Assembly-CSharp.dll</HintPath></Reference>
+    <Reference Include="Comfort"><HintPath>libs\Comfort.dll</HintPath></Reference>
+    <Reference Include="Comfort.Unity"><HintPath>libs\Comfort.Unity.dll</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>libs\UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>libs\UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.TerrainModule"><HintPath>libs\UnityEngine.TerrainModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.PhysicsModule"><HintPath>libs\UnityEngine.PhysicsModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.AssetBundleModule"><HintPath>libs\UnityEngine.AssetBundleModule.dll</HintPath></Reference>
+  </ItemGroup>
+
+  <!-- Every build copies the DLL into the game. Skipped when the folder doesn't exist. -->
+  <Target Name="DeployToGame41" AfterTargets="Build" Condition="Exists('F:\SPT4.1\BepInEx\plugins\TraceSix')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="F:\SPT4.1\BepInEx\plugins\TraceSix" />
+    <Message Importance="high" Text="==&gt; TraceSix.dll deployed to F:\SPT4.1\BepInEx\plugins\TraceSix" />
+  </Target>
+
+</Project>
