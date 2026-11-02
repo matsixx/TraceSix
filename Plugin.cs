@@ -8,7 +8,7 @@ namespace TraceSix
     // Global illumination for SPT: a voxel copy of the world (VoxelScene), light probes that trace through it
     // (GiProbes), and the pass that lights the picture from them in place of the game's flat ambient
     // (GiCamera, GameAmbient); hardware ray tracing beside it (GiRt). The raid's lifecycle is GiRaid.
-    [BepInPlugin("com.matsix.tracesix", "TraceSix", "1.0.0")]
+    [BepInPlugin("com.matsix.tracesix", "TraceSix", "1.0.1")]
     public class Plugin : BaseUnityPlugin
     {
         public static ManualLogSource MyLog;

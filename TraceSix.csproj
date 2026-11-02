@@ -6,7 +6,7 @@
     <AssemblyName>TraceSix</AssemblyName>
     <Nullable>disable</Nullable>
     <Authors>matsix</Authors>
-    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <AssemblyVersion>1.0.1</AssemblyVersion>
     <FileVersion>$(AssemblyVersion)</FileVersion>
     <Version>$(AssemblyVersion)</Version>
     <Configurations>Debug;Release</Configurations>

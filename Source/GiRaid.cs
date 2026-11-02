@@ -1,6 +1,7 @@
 using System.Collections;
 using BepInEx;
 using BepInEx.Configuration;
+using Comfort.Common;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -225,13 +226,15 @@ namespace TraceSix.Source
         // player camera before taking the list of meshes to voxelise.
         // (0.24.156) Without end: to 0.24.155 it gave up after 150 looks (5 min), and a long loading screen (the map's sky
         // loaded, the player's camera not yet) left the whole raid without the mod. After 5 min it looks every 5 s.
+        // (1.0.1) The game world first, a static read: the sky search walks every object in the scene, and in the menu and
+        // the hideout - where this waits forever - it ran every 2 s, on or off ("tiny stutters around every 2 seconds").
         private IEnumerator WaitForRaid()
         {
             yield return new WaitForSeconds(5f);
             for (int i = 0; ; i++)
             {
-                Object sky = FindSky();
-                if (sky != null && Camera.main != null && RaidReady())
+                Object sky = RaidReady() ? FindSky() : null;
+                if (sky != null && Camera.main != null)
                 {
                     if (sky.GetInstanceID() == _raidSky || sky.GetInstanceID() == _leftAlone) break;
                     yield return new WaitForSeconds(6f);   // late-streaming map pieces
@@ -354,11 +357,14 @@ namespace TraceSix.Source
         {
             try
             {
-                EFT.GameWorld world = FindObjectOfType<EFT.GameWorld>();
+                EFT.GameWorld world = World();
                 return world != null ? world.LocationId ?? "" : "";
             }
             catch (System.Exception) { return ""; }
         }
+
+        // (1.0.1) The game world the game registers (Singleton<GameWorld>): a static read, no scene search. Null in the menu.
+        private static EFT.GameWorld World() => Singleton<EFT.GameWorld>.Instantiated ? Singleton<EFT.GameWorld>.Instance : null;
 
         // (1.0.0) The raid is really there: its game world, with the map's name and the player in it. The sky and a camera
         // were taken as the sign to 1.0.0 - in VR the headset camera is there all through the loading, and a Fika client's
@@ -368,7 +374,7 @@ namespace TraceSix.Source
         {
             try
             {
-                EFT.GameWorld world = FindObjectOfType<EFT.GameWorld>();
+                EFT.GameWorld world = World();
                 return world != null && !(world is HideoutGameWorld) && !string.IsNullOrEmpty(world.LocationId) && world.MainPlayer != null;
             }
             catch (System.Exception) { return false; }
@@ -414,7 +420,7 @@ namespace TraceSix.Source
             if (sky != null) return sky;
             sky = FindObjectOfType<EFT.Weather.TODSkySimple>();
             if (sky == null) return null;
-            EFT.GameWorld world = FindObjectOfType<EFT.GameWorld>();
+            EFT.GameWorld world = World();
             return world != null && !(world is HideoutGameWorld) ? sky : null;
         }
 
