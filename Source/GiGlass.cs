@@ -196,7 +196,7 @@ namespace TraceSix.Source
                 Tris.SetData(pts);
                 TriVerts = pts.Count;
             }
-            Plugin.MyLog.LogInfo("[TraceSix] See-Through Glass Windows: " + used + " of " + _panes.Count + " panes (" + batchedN + " static-batched) in one GPU buffer, "
+            Plugin.LogDetail("[TraceSix] See-Through Glass Windows: " + used + " of " + _panes.Count + " panes (" + batchedN + " static-batched) in one GPU buffer, "
                 + pts.Count / 3 + " triangles (" + pts.Count * 12 / 1024 + " KB, " + reads.Count + " meshes read in " + sw.ElapsedMilliseconds + " ms)"
                 + (unread > 0 ? "; " + unread + " not readable" + (why != null ? " (" + why + ")" : "") : "")
                 + (outside > 0 ? "; " + outside + " left out: their triangles are not where their renderer is" : "") + ".");
@@ -275,7 +275,7 @@ namespace TraceSix.Source
             }
             var sb = new System.Text.StringBuilder();
             foreach (var kv in names) sb.Append(sb.Length > 0 ? ", " : "").Append(kv.Key);
-            Plugin.MyLog.LogInfo("[TraceSix] See-Through Glass Windows: " + swapped + " glass materials the game draws as solid walls are drawn as glass"
+            Plugin.LogDetail("[TraceSix] See-Through Glass Windows: " + swapped + " glass materials the game draws as solid walls are drawn as glass"
                 + (swapped > 0 ? " (" + sb + ")" : "") + ", " + _panes.Count + " panes.");
             BuildTris();
         }
@@ -296,7 +296,7 @@ namespace TraceSix.Source
                 if (m.shader == GiAssets.Glass && o.shader != null) { m.shader = o.shader; m.renderQueue = o.queue; back++; }
             }
             _orig.Clear();
-            Plugin.MyLog.LogInfo("[TraceSix] See-Through Glass Windows: " + back + " glass materials back on the game's own shader.");
+            Plugin.LogDetail("[TraceSix] See-Through Glass Windows: " + back + " glass materials back on the game's own shader.");
         }
 
         // GiRaid.Update: the setting switched during a raid (the ray-traced scene keeps what it was built with until the next raid)

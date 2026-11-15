@@ -62,7 +62,7 @@ namespace TraceSix.Source
             var sw = System.Diagnostics.Stopwatch.StartNew();
             _owners = UnityEngine.Object.FindObjectsOfType<AmbientLight>();
             _nextFind = Time.unscaledTime + 20f;
-            Plugin.MyLog.LogInfo("[TraceSix] Game ambient: " + _owners.Length + " AmbientLight found (the scene search took "
+            Plugin.LogDetail("[TraceSix] Game ambient: " + _owners.Length + " AmbientLight found (the scene search took "
                 + sw.Elapsed.TotalMilliseconds.ToString("F1") + " ms).");
         }
 
@@ -82,7 +82,7 @@ namespace TraceSix.Source
                     if (!_logged)
                     {
                         _logged = true;
-                        Plugin.MyLog.LogInfo("[TraceSix] Game ambient: sky term of '" + m.shader.name + "' is replaced by the probe light on the main camera.");
+                        Plugin.LogDetail("[TraceSix] Game ambient: sky term of '" + m.shader.name + "' is replaced by the probe light on the main camera.");
                     }
                 }
             }

@@ -46,7 +46,7 @@ These are the main ones. The Advanced view has many more.
 |---|---|---|
 | Enabled | On | Off restores the game's own lighting. |
 | Toggle Key | Insert | Switches Enabled off and on to compare. |
-| Strength | 1.5 | How bright the bounced light is. 1 = exactly what the game's sun and sky give. |
+| Strength | 1 | How bright the bounced light is. 1 = exactly what the game's sun and sky give. |
 | Detail Reach | 24 | How far around you the finest light reaches, in metres (16 = cheaper). |
 | Light Update Rate | 1 | How much of the light is recalculated every frame. Lower is cheaper but settles slower. |
 | Lamp Light | On | The map's lamps bounce their light too. |
@@ -55,7 +55,7 @@ These are the main ones. The Advanced view has many more.
 | VR Support | On | Runs the mod in VR. |
 | Maps Without Indirect Light | laboratory,labyrinth | Maps the mod stays off on. The Lab and the Labyrinth are lit by lamps alone and look as intended with the game's own light. |
 | Glowing Surfaces Give Light | On | Signs, screens and other glowing surfaces light what is around them. |
-| See-Through Glass Windows | On | Glass-block windows show what is behind them. |
+| See-Through Glass Windows | Off | Glass-block windows show what is behind them. |
 | Ray Tracing | Off | Hardware ray tracing. The game pauses for a few seconds once, when a raid starts, while the map is read in. |
 | RT Global Illumination | On | The bounced light comes from the rays instead of the voxel lookup. Needs Ray Tracing. |
 | Ray-Traced Direct Lamp Shadows | On | Lamp light is shadowed by the real geometry, so it no longer goes through walls and floors. Needs Ray Tracing. |
@@ -63,8 +63,8 @@ These are the main ones. The Advanced view has many more.
 | Ambient Occlusion | ScreenSpace | Contact shading on top of the ray-traced light. ScreenSpace uses AOSix. |
 | Ray Tracing In VR (EXPERIMENTAL) | Off | Advanced. Ray-traced bounced light in VR too. |
 
-The Advanced view of Ray Tracing also holds the denoiser's switches - **Pre-Blur**, **Stabilize Output**, **Voxel Light For New
-Pixels** and **Instant Light Switches**, all on by default. Switch one off to see what it does.
+The Advanced view of Ray Tracing also holds the denoiser's switches - **Pre-Blur**, **Stabilize Output** and **Instant Light
+Switches**, all on by default (switch one off to see what it does), and **Voxel Light For New Pixels**, off by default.
 
 ## Performance
 

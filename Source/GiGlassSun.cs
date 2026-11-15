@@ -61,7 +61,7 @@ namespace TraceSix.Source
         {
             if (_pass == -2 && GiAssets.Probes != null)
             {
-                _mat = new Material(GiAssets.Probes) { hideFlags = HideFlags.DontSave };
+                _mat = GiSkyAmbient.NewProbesMaterial();
                 _pass = _mat.FindPass("GLASSSUN");
                 if (_pass < 0) Plugin.MyLog.LogWarning("[TraceSix] See-Through Glass Windows: the tracesix bundle has no GLASSSUN pass - the glass's sun goes unshadowed. Rebuild the bundle.");
             }
@@ -86,7 +86,7 @@ namespace TraceSix.Source
             if (GiConfig.GlassView.Value != GlassViewMode.Off && Time.unscaledTime >= _nextViewLog)
             {
                 _nextViewLog = Time.unscaledTime + 5f;
-                Plugin.MyLog.LogInfo("[TraceSix] Glass View: '" + _cam.name + "' draws all the glass (" + GiGlass.TriVerts / 3 + " triangles, one draw call) into "
+                Plugin.LogDetail("[TraceSix] Glass View: '" + _cam.name + "' draws all the glass (" + GiGlass.TriVerts / 3 + " triangles, one draw call) into "
                     + w + "x" + h + " for its sun shadow and its reflection's sky from the voxel world.");
             }
             if (_cb == null)
@@ -115,7 +115,7 @@ namespace TraceSix.Source
                 if (!_said)
                 {
                     _said = true;
-                    Plugin.MyLog.LogInfo("[TraceSix] See-Through Glass Windows: the glass's sun shadow and its reflection's sky on '" + _cam.name
+                    Plugin.LogDetail("[TraceSix] See-Through Glass Windows: the glass's sun shadow and its reflection's sky on '" + _cam.name
                         + "' from the voxel world (" + w + "x" + h + " at most, one sample per 2 x 2 of glass; no ray tracing).");
                 }
             }

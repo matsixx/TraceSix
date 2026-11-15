@@ -102,7 +102,7 @@ namespace TraceSix.Source
             }
             if (_mat == null)
             {
-                _mat = new Material(GiAssets.Probes) { hideFlags = HideFlags.DontSave };
+                _mat = GiSkyAmbient.NewProbesMaterial();
                 _passQuarter = _mat.FindPass("GIQUARTER");
                 _passFlashPts = _mat.FindPass("FLASHPTS");
                 _passFlashSum = _mat.FindPass("FLASHSUM");
@@ -160,14 +160,14 @@ namespace TraceSix.Source
                 else GiStartup.LightOn();
                 // A scope's camera is switched on and off with every aim: said the first time only.
                 if (!Scope || !_said)
-                    Plugin.MyLog.LogInfo("[TraceSix] Probe light attached to '" + _cam.name + "'" + (Scope ? " (the scope)" : "") + " at " + LightEvt + " (" + w + "x" + h
+                    Plugin.LogDetail("[TraceSix] Probe light attached to '" + _cam.name + "'" + (Scope ? " (the scope)" : "") + " at " + LightEvt + " (" + w + "x" + h
                         + (smooth ? ", smoothed at " + qw + "x" + qh + (fast ? ", looked up at that size" : ", looked up for every pixel") : ", not smoothed") + ").");
                 _said = true;
             }
             if (stereo && !_saidVr)
             {
                 _saidVr = true;
-                Plugin.MyLog.LogInfo("[TraceSix] Probe light in VR: each eye of '" + _cam.name + "' lit on its own (" + w + "x" + h + " an eye"
+                Plugin.LogDetail("[TraceSix] Probe light in VR: each eye of '" + _cam.name + "' lit on its own (" + w + "x" + h + " an eye"
                     + (rtMode == 2 ? "; the ray-traced light lights the picture for now" : "") + ").");
             }
             bool edges = !Scope && GiConfig.EdgeDebug.Value && smooth;

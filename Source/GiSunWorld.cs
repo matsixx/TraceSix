@@ -104,7 +104,7 @@ namespace TraceSix.Source
             if (want != _lastWant)
             {
                 if (!want && _at > 0)
-                    Plugin.MyLog.LogInfo("[TraceSix] Sun Shadow Mode RayTracedWorld: giving the game its sun shadow back - "
+                    Plugin.LogDetail("[TraceSix] Sun Shadow Mode RayTracedWorld: giving the game its sun shadow back - "
                         + (scope ? "a scope is rendering." : "the sun's rays have been missing for half a second (" + _missed + ")."));
                 _lastWant = want;
                 _since = now;
@@ -142,7 +142,7 @@ namespace TraceSix.Source
                 }
             }
             if (_at == target && (target == 0 ? !wasNone : !wasAll))
-                Plugin.MyLog.LogInfo("[TraceSix] Sun Shadow Mode RayTracedWorld: " + (target == 0
+                Plugin.LogDetail("[TraceSix] Sun Shadow Mode RayTracedWorld: " + (target == 0
                     ? "the game's sun shadow draws the map again" + (f - _scopeFrame <= 2 && f - _scopeTraced > 2 ? " (a scope is in use)." : ".")
                     : "the map's meshes are out of the game's sun shadow (" + _rs.Count + " of them)."));
         }
@@ -183,7 +183,7 @@ namespace TraceSix.Source
             if (_retaken > 0 && now - _retakenSaid > 30f)
             {
                 _retakenSaid = now;
-                Plugin.MyLog.LogInfo("[TraceSix] Sun Shadow Mode RayTracedWorld: " + _retaken + " meshes had their game shadow back (switched on again by the game) and were taken out again.");
+                Plugin.LogDetail("[TraceSix] Sun Shadow Mode RayTracedWorld: " + _retaken + " meshes had their game shadow back (switched on again by the game) and were taken out again.");
                 _retaken = 0;
             }
         }
@@ -278,7 +278,7 @@ namespace TraceSix.Source
             if (!_saidList)
             {
                 _saidList = true;
-                Plugin.MyLog.LogInfo("[TraceSix] Sun Shadow Mode RayTracedWorld: " + _rs.Count + " meshes to take out of the game's sun shadow - "
+                Plugin.LogDetail("[TraceSix] Sun Shadow Mode RayTracedWorld: " + _rs.Count + " meshes to take out of the game's sun shadow - "
                     + inScene + " in the ray-traced scene, " + lower + " lower levels of detail of them, " + proxies + " shadow-only stand-ins, "
                     + standIns + " far-view stand-ins; " + kept + " alpha-tested ones keep the game's shadow (listed in "
                     + ((Time.realtimeSinceStartup - t0) * 1000f).ToString("F0") + " ms of wall time).");

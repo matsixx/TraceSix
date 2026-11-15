@@ -69,7 +69,7 @@ namespace TraceSix.Source
             Detach();
             if (_pass == -2 && GiAssets.Probes != null)
             {
-                _mat = new Material(GiAssets.Probes) { hideFlags = HideFlags.DontSave };
+                _mat = GiSkyAmbient.NewProbesMaterial();
                 _pass = _mat.FindPass("GLASSDOWN");
             }
             if (_before == null) _before = new CommandBuffer { name = "TraceSix Glass: The Picture Behind (half size, mips)" };

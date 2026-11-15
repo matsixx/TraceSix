@@ -70,6 +70,7 @@ namespace TraceSix.Source
         // The terrain as triangles: meshes of this mod's own, kept until the raid is over (the build reads them on
         // the render thread).
         private static readonly List<Mesh> _terrain = new List<Mesh>();
+
         // (0.24.89) "Ray-Traced Textures": the materials' atlas and its eighth-size copy, held until the native side has
         // copied them at the build (then let go); the tile size and tiles a row it was made with (0 = none this raid).
         private static RenderTexture _atlas, _atlasLow;
@@ -77,6 +78,8 @@ namespace TraceSix.Source
         // (0.24.95) "Log Surface Ahead": the materials each mesh's first use handed the ray tracing, by mesh id (names and
         // ids only - nothing here keeps the map's assets alive past the raid)
         private static readonly Dictionary<int, string> _firstMats = new Dictionary<int, string>();
+        // ... and which of its submeshes the ray-traced scene really holds (decals and non-solid ones are left out)
+        private static readonly Dictionary<int, bool[]> _tracedSolid = new Dictionary<int, bool[]>();
         // (0.24.81) The doors' parts in the scene: their instance index, their transform, the matrix last handed over.
         // Each frame those that moved go to the native side, which refreshes the top level in place before the trace:
         // a door opening lets the rays (and the sun and lamps) through its doorway as it swings.
@@ -138,6 +141,7 @@ namespace TraceSix.Source
                 if (verbose != _verbose) { _verbose = verbose; RtSetVerbose(verbose); }
                 Drain();
                 _ready = RtSceneReady() != 0;
+                if (!_ready && _builtFor == raid && raid != 0) GiStartup.Note("the ray-traced scene building (render thread: the game waits)");
                 int status = RtStatus();
                 if (status < 0 && !_saidStatus)
                 {
@@ -256,6 +260,7 @@ namespace TraceSix.Source
             _ready = false;
             _doors.Clear();
             _firstMats.Clear();
+            _tracedSolid.Clear();
             GiSunWorld.Forget(false);   // (the map's renderers go with the raid)
             foreach (Mesh m in _terrain) if (m != null) UnityEngine.Object.Destroy(m);
             _terrain.Clear();
@@ -272,6 +277,59 @@ namespace TraceSix.Source
         {
             if (!_loaded) { Plugin.MyLog.LogInfo("[TraceSixRT] Buffer sharing: the native part is not loaded."); return; }
             GL.IssuePluginEvent(_func, 40);
+        }
+
+        // Under the point: the traced terrain's height (the same samples and triangles as TerrainMesh) and every collider
+        // straight down from 1 m above it - a ground mesh between a road and the terrain shows here.
+        private static void AppendGround(StringBuilder sb, Vector3 p)
+        {
+            foreach (Terrain t in Terrain.activeTerrains)
+            {
+                TerrainData td = t != null ? t.terrainData : null;
+                if (td == null) continue;
+                Vector3 pos = t.transform.position, size = td.size;
+                float u = (p.x - pos.x) / size.x, v = (p.z - pos.z) / size.z;
+                if (u < 0f || u > 1f || v < 0f || v > 1f) continue;
+                int res = td.heightmapResolution, step = Mathf.Max(1, (res - 1) / 1024), cells = Mathf.Max((res - 1) / step, 1);
+                float gx = u * (res - 1) / step, gz = v * (res - 1) / step;
+                int cx = Mathf.Min((int)gx, cells - 1), cz = Mathf.Min((int)gz, cells - 1);
+                float fx = Mathf.Clamp01(gx - cx), fz = Mathf.Clamp01(gz - cz);
+                int x0 = Mathf.Min(cx * step, res - 1), x1 = Mathf.Min((cx + 1) * step, res - 1), z0 = Mathf.Min(cz * step, res - 1), z1 = Mathf.Min((cz + 1) * step, res - 1);
+                float h00 = td.GetHeight(x0, z0), h10 = td.GetHeight(x1, z0), h01 = td.GetHeight(x0, z1), h11 = td.GetHeight(x1, z1);
+                float h = fx + fz <= 1f ? h00 + (h10 - h00) * fx + (h01 - h00) * fz : h11 + (h01 - h11) * (1f - fx) + (h10 - h11) * (1f - fz);
+                float y = h + pos.y;
+                sb.Append("\n  TERRAIN '").Append(t.name).Append("': the traced terrain here at y ").Append(y.ToString("F3"))
+                  .Append(" - the hit point is ").Append(((p.y - y) * 100f).ToString("F1")).Append(" cm above it");
+            }
+            var below = Physics.RaycastAll(p + Vector3.up, Vector3.down, 3f, ~0, QueryTriggerInteraction.Ignore);
+            System.Array.Sort(below, (a, b) => a.distance.CompareTo(b.distance));
+            sb.Append("\n  COLLIDERS straight down from 1 m above it:");
+            if (below.Length == 0) sb.Append(" none within 3 m");
+            foreach (RaycastHit h in below)
+                sb.Append("\n    '").Append(PathOf(h.collider.transform)).Append("' (").Append(h.collider.GetType().Name).Append(", layer ")
+                  .Append(LayerMask.LayerToName(h.collider.gameObject.layer)).Append(") at y ").Append(h.point.y.ToString("F3"));
+        }
+
+        private static bool InTracedScene(Renderer r)
+        {
+            Mesh m = r is MeshRenderer ? r.GetComponent<MeshFilter>()?.sharedMesh : r is SkinnedMeshRenderer sk ? sk.sharedMesh : null;
+            if (m == null || !_tracedSolid.TryGetValue(m.GetInstanceID(), out bool[] s)) return false;
+            foreach (bool k in s) if (k) return true;
+            return false;
+        }
+
+        // A renderer the game is not drawing reports no bounds: its mesh's box, placed where its object is.
+        private static bool MeshWorldBounds(Renderer r, out Bounds b)
+        {
+            b = default;
+            Mesh m = r is MeshRenderer ? r.GetComponent<MeshFilter>()?.sharedMesh : r is SkinnedMeshRenderer sk ? sk.sharedMesh : null;
+            if (m == null) return false;
+            Bounds local = m.bounds;
+            Matrix4x4 l2w = r.transform.localToWorldMatrix;
+            b = new Bounds(l2w.MultiplyPoint3x4(local.center), Vector3.zero);
+            for (int c = 0; c < 8; c++)
+                b.Encapsulate(l2w.MultiplyPoint3x4(local.center + Vector3.Scale(local.extents, new Vector3((c & 1) == 0 ? -1 : 1, (c & 2) == 0 ? -1 : 1, (c & 4) == 0 ? -1 : 1))));
+            return true;
         }
 
         internal static void Surface(Camera cam)
@@ -291,18 +349,30 @@ namespace TraceSix.Source
             // the renderers there: those whose box takes the hit point (or, with no collider hit, the view ray), smallest first
             var found = new List<Renderer>();
             var ray = new Ray(ro, rd);
-            foreach (Renderer r in UnityEngine.Object.FindObjectsOfType<Renderer>())
+            // also those the game is not drawing now, if the ray-traced scene holds them (an invisible surface the rays meet);
+            // what the scene holds is looked for a little wider round the point. Those first, then the smallest.
+            foreach (Renderer r in UnityEngine.Object.FindObjectsOfType<Renderer>(true))
             {
-                if (r == null || !r.enabled || !r.gameObject.activeInHierarchy || !(r is MeshRenderer || r is SkinnedMeshRenderer)) continue;
-                Bounds b = r.bounds;
-                b.Expand(0.3f);
+                if (r == null || !(r is MeshRenderer || r is SkinnedMeshRenderer)) continue;
+                bool drawn = r.enabled && r.gameObject.activeInHierarchy && !r.forceRenderingOff;
+                bool traced = InTracedScene(r);
+                if (!drawn && !traced) continue;
+                Bounds b;
+                if (drawn) b = r.bounds;
+                else if (!MeshWorldBounds(r, out b)) continue;
+                b.Expand(traced ? 1.0f : 0.3f);
                 if (hitSome ? !b.Contains(p) : !b.IntersectRay(ray)) continue;
                 found.Add(r);
             }
-            found.Sort((a, b) => Vol(a.bounds).CompareTo(Vol(b.bounds)));
+            found.Sort((a, b) =>
+            {
+                int ka = InTracedScene(a) ? 0 : 1, kb = InTracedScene(b) ? 0 : 1;
+                return ka != kb ? ka.CompareTo(kb) : Vol(a.bounds).CompareTo(Vol(b.bounds));
+            });
             if (found.Count == 0) sb.Append("\n  no renderer there.");
+            if (hitSome) AppendGround(sb, p);
             var block = new MaterialPropertyBlock();
-            for (int n = 0; n < found.Count && n < 6; n++)
+            for (int n = 0; n < found.Count && n < 16; n++)
             {
                 Renderer r = found[n];
                 sb.Append("\n  RENDERER '").Append(PathOf(r.transform)).Append("' (").Append(r.GetType().Name).Append(", layer ")
@@ -310,6 +380,7 @@ namespace TraceSix.Source
                 // (0.24.116) its sun shadow: as the game has it, the game's culling, RayTracedWorld
                 sb.Append("\n    shadow ").Append(r.shadowCastingMode).Append(", ").Append(r.enabled ? "enabled" : "DISABLED")
                   .Append(r.forceRenderingOff ? ", not drawn (forceRenderingOff)" : "")
+                  .Append(r.gameObject.activeInHierarchy ? "" : ", its object INACTIVE")
                   .Append(GiCulling.Culls(r) ? ", switched on and off by the game's culling zones" : "")
                   .Append("; ").Append(GiSunWorld.Status(r));
                 Mesh mesh = r is MeshRenderer ? r.GetComponent<MeshFilter>()?.sharedMesh : r is SkinnedMeshRenderer sk ? sk.sharedMesh : null;
@@ -339,6 +410,13 @@ namespace TraceSix.Source
                     }
                     else sb.Append(", no vertex colours");
                     sb.Append("\n    ray tracing took: ").Append(_firstMats.TryGetValue(mesh.GetInstanceID(), out string took) ? took : "(this mesh is not in the ray-traced scene)");
+                    if (_tracedSolid.TryGetValue(mesh.GetInstanceID(), out bool[] inScene))
+                    {
+                        var kept = new List<int>();
+                        for (int k = 0; k < inScene.Length; k++) if (inScene[k]) kept.Add(k);
+                        sb.Append("\n    in the ray-traced scene: ").Append(kept.Count == 0 ? "NONE of its submeshes (left out: decals / not solid)"
+                            : "submesh " + string.Join(", ", kept) + (kept.Count < inScene.Length ? " (the rest left out)" : ""));
+                    }
                 }
                 Material[] mats = r.sharedMaterials;
                 // what the renderer overrides per object, for all its materials and for each one
@@ -440,7 +518,7 @@ namespace TraceSix.Source
             while (count > 0 && count < mats.Count && (mats[count].layer > 0 || mats[count].layer == -2)) count--;
             int rows = (count + cols - 1) / cols;
             tinted = 0;
-            var mat = new Material(GiAssets.Probes) { hideFlags = HideFlags.DontSave };
+            var mat = GiSkyAmbient.NewProbesMaterial();
             int pass = mat.FindPass("RTTILE"), glowPass = mat.FindPass("RTGLOWTILE");
             if (count == 0 || pass < 0) { UnityEngine.Object.Destroy(mat); done(0, 0, null); yield break; }
             ReleaseAtlas();
@@ -648,6 +726,7 @@ namespace TraceSix.Source
             int varCopies = 0;
             _doors.Clear();
             _firstMats.Clear();
+            _tracedSolid.Clear();
             int glassParts = 0;
             // (0.24.117) a submesh's material for the ray tracing: the solid one, or the glass (see-through: only with the atlas -
             // without a tile the kernel could not tell it from a leaf)
@@ -680,6 +759,7 @@ namespace TraceSix.Source
                             .Append(" (tile ").Append(tileOf[i][k]).Append(')');
                     }
                     _firstMats[mesh.GetInstanceID()] = took.ToString();
+                    _tracedSolid[mesh.GetInstanceID()] = solid[i];
                 }
                 bool[] s = solid[i];
                 for (int k = 0; k < s.Length; k++)
@@ -722,7 +802,7 @@ namespace TraceSix.Source
                     for (int c = 0; c < 4; c++) instMat.Add(l2w[r, c]);
             }
             VoxelScene.EachNear(Place);
-            if (glassParts > 0) Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: " + glassParts + " glass parts of meshes are in the scene as see-through, tinting the sun's light.");
+            if (glassParts > 0) Plugin.LogDetail("[TraceSix] Ray tracing: " + glassParts + " glass parts of meshes are in the scene as see-through, tinting the sun's light.");
             double listMs = sw.Elapsed.TotalMilliseconds;
             sw.Restart();
 
@@ -844,7 +924,7 @@ namespace TraceSix.Source
             RtSetMaterials(_atlas != null ? _atlas.GetNativeTexturePtr() : IntPtr.Zero, _atlasLow != null ? _atlasLow.GetNativeTexturePtr() : IntPtr.Zero,
                 tileSize, tileCols, tileData ?? new float[TileFloats], tileCount);
             if (tileCount > 0)
-                Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: " + tileCount + " tiles drawn into the atlas (" + tileIndex.Count + " materials, " + painted + " of them painted: three layers each; " + tinted + " painted through a tint mask; "
+                Plugin.LogDetail("[TraceSix] Ray tracing: " + tileCount + " tiles drawn into the atlas (" + tileIndex.Count + " materials, " + painted + " of them painted: three layers each; " + tinted + " painted through a tint mask; "
                     + glowTiles + " glowing: a glow tile each; "
                     + tileSize + " px a tile, " + _atlas.width + "x" + _atlas.height
                     + ", " + atlasMs.ToString("F0") + " ms over frames)" + (tileCount < tileMats.Count ? "; " + (tileMats.Count - tileCount) + " more did not fit (the voxels' colour for those)" : "") + ".");
@@ -859,11 +939,11 @@ namespace TraceSix.Source
             }
             RtSetVariants(varMesh.ToArray(), varFirst, varMesh.Count, varFlat.ToArray(), varFlat.Count, instVar.ToArray(), instVar.Count);
             if (varMesh.Count > 0)
-                Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: " + varCopies + " placed copies have other materials than their mesh's first copy (" + varMesh.Count
+                Plugin.LogDetail("[TraceSix] Ray tracing: " + varCopies + " placed copies have other materials than their mesh's first copy (" + varMesh.Count
                     + " material variants: their own colours, the mesh's geometry).");
             RtSetScene(descs, descs.Length, subs.ToArray(), subs.Count / 5, instMesh.ToArray(), instMat.ToArray(), instFlags.ToArray(), instMesh.Count);
             GL.IssuePluginEvent(_func, 1);
-            Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: " + meshes.Count + " meshes (" + _terrain.Count + " of them terrain, " + (terrainTris / 1e6f).ToString("F2") + " million triangles), "
+            Plugin.LogDetail("[TraceSix] Ray tracing: " + meshes.Count + " meshes (" + _terrain.Count + " of them terrain, " + (terrainTris / 1e6f).ToString("F2") + " million triangles), "
                 + instMesh.Count + " placed (" + fixtures + " of them lamp fixtures: lamp shadow rays look past those), " + cutouts + " submeshes alpha-tested, " + decals + " placed road / sidewalk decal submeshes left out (the ground under them stops the rays), handed to the native side (the list " + listMs.ToString("F0") + " ms; the terrain "
                 + terrainMs.ToString("F0") + " ms; the meshes' GPU buffers " + ptrMs.ToString("F0") + " ms over " + frames + " frames; left out: " + noPos + " without positions, "
                 + oddFormat + " with positions in another format, " + notTriangles + " submeshes not of triangles); " + _doors.Count + " of the placed meshes are door parts, followed as they swing. It builds on the render thread now: the game stops for that, once.");
@@ -1531,7 +1611,7 @@ namespace TraceSix.Source
             if (!_saidSun)
             {
                 _saidSun = true;
-                Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: sun shadows ray-traced (" + _sunO.width + "x" + _sunO.height + " rays) into the shadow mask of '" + sunL.name + "'"
+                Plugin.LogDetail("[TraceSix] Ray tracing: sun shadows ray-traced (" + _sunO.width + "x" + _sunO.height + " rays) into the shadow mask of '" + sunL.name + "'"
                     + (far != null ? " and EFT's distant-shadow mask" : " (EFT precomputes no distant-shadow mask here: Unity's only)") + ", put on the light at culling.");
             }
         }
@@ -1541,7 +1621,7 @@ namespace TraceSix.Source
             bool on = RtOn();
             if (on && _mat == null)
             {
-                _mat = new Material(GiAssets.Probes) { hideFlags = HideFlags.DontSave };
+                _mat = GiSkyAmbient.NewProbesMaterial();
                 _passRays = _mat.FindPass("RTRAYS");
                 _passShade = _mat.FindPass("RTSHADE");
                 _passTemporal = _mat.FindPass("RTTEMPORAL");
@@ -1865,7 +1945,7 @@ namespace TraceSix.Source
                 if (!_saidLamp)
                 {
                     _saidLamp = true;
-                    Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: direct lamp shadows ray-traced (" + (_lampO.width / 2) + "x" + _lampO.height + (lampRes ? ", lamps chosen by ReSTIR DI" : "")
+                    Plugin.LogDetail("[TraceSix] Ray tracing: direct lamp shadows ray-traced (" + (_lampO.width / 2) + "x" + _lampO.height + (lampRes ? ", lamps chosen by ReSTIR DI" : "")
                         + " rays: the two lamps that light each point most traced exactly, one ray for the rest), laid into the lamps' light by TraceSix's copy of the light pass - "
                         + (_lampEarly ? "this frame's (made before the game lights the frame)" : "the frame after") + ".");
                 }
@@ -2069,7 +2149,7 @@ namespace TraceSix.Source
                 _cam.AddCommandBuffer(LateEvt, _cbLate);
                 _traceOn = true;
                 if (!_said)
-                    Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: tracing from '" + _cam.name + "' (" + w + "x" + h + ", one pixel in " + step + " each way: " + gw + "x" + gh
+                    Plugin.LogDetail("[TraceSix] Ray tracing: tracing from '" + _cam.name + "' (" + w + "x" + h + ", one pixel in " + step + " each way: " + gw + "x" + gh
                         + " traced, " + rays + " ray" + (rays == 1 ? "" : "s") + " each; denoiser " + (denoise ? "on" : "off") + "; "
                         + (apply ? "lighting the picture" : "not lighting the picture (the voxel light does)") + "; traced "
                         + (early ? "while the game lights the frame" : "after the game's lighting") + ").");
@@ -2083,7 +2163,7 @@ namespace TraceSix.Source
             if (stereo && !_saidVr)
             {
                 _saidVr = true;
-                Plugin.MyLog.LogInfo("[TraceSix] Ray tracing in VR: each eye of '" + _cam.name + "' traced on its own (" + w + "x" + h + " an eye, " + gw + "x" + gh
+                Plugin.LogDetail("[TraceSix] Ray tracing in VR: each eye of '" + _cam.name + "' traced on its own (" + w + "x" + h + " an eye, " + gw + "x" + gh
                     + " traced). The light only: sun / lamp shadows, ray-traced AO and ReflectSix's ray-traced reflections stay flat screen.");
             }
             KeepEye();

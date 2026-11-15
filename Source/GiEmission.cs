@@ -175,7 +175,7 @@ namespace TraceSix.Source
                 sb.Append("\n    The largest left out beside a light:");
                 foreach (Seen s in _left) sb.Append("\n      ").Append(s.text);
             }
-            Plugin.MyLog.LogInfo(sb.ToString());
+            Plugin.LogDetail(sb.ToString());
         }
 
         //--- the formula ----------------------------------------------------------------------------------------

@@ -498,7 +498,7 @@ namespace TraceSix.Source
 
         private static bool Ensure()
         {
-            if (_mat == null) _mat = new Material(GiAssets.Probes) { hideFlags = HideFlags.DontSave };
+            if (_mat == null) _mat = GiSkyAmbient.NewProbesMaterial();
             if (_cb == null) _cb = new CommandBuffer { name = "TraceSix Light Volumes" };
             Shader.SetGlobalVector(IdGrid, new Vector4(NX, NY, NZ, Fade));
             if (_ray == null) GiStartup.Note("the light volumes' working targets made");
@@ -600,7 +600,7 @@ namespace TraceSix.Source
                     _colTex.SetPixelData(_colOff, 0);
                     _colTex.Apply(false, false);
                 }
-                Plugin.MyLog.LogInfo(_scatterOk
+                Plugin.LogDetail(_scatterOk
                     ? "[TraceSix] Light updates: scattered - of every column one cell a redo, cells that have just come into reach first."
                     : "[TraceSix] Light updates: one layer after another (the bundle has no CELLPUT pass, or this GPU cannot write to the cells' textures in place).");
             }
@@ -618,7 +618,7 @@ namespace TraceSix.Source
                     _blendOk = _ambS.IsCreated();
                 }
                 if (!_blendOk) Plugin.MyLog.LogWarning("[TraceSix] Blend Neighbouring Light: the copy of the light volumes could not be made (or the bundle has no CELLBLEND pass): each cell shows its own light.");
-                else Plugin.MyLog.LogInfo("[TraceSix] Blend Neighbouring Light: the picture reads a blended copy of the light volumes (" + (NX * (float)NY * Levels * NZ * 6 * 8 / (1024f * 1024f)).ToString("F0") + " MB).");
+                else Plugin.LogDetail("[TraceSix] Blend Neighbouring Light: the picture reads a blended copy of the light volumes (" + (NX * (float)NY * Levels * NZ * 6 * 8 / (1024f * 1024f)).ToString("F0") + " MB).");
             }
             if (_blendOk && _join == null)
             {
@@ -724,6 +724,10 @@ namespace TraceSix.Source
             Shader.SetGlobalVectorArray(IdPcMin, _pcMin);
         }
 
+        // Layers redone a frame while the volumes first fill (the light is off until they are): at "Light Update Rate" 1 the
+        // fill was 768 frames, ~7.6 s after the voxel volumes. ~0.55 ms of GPU a layer; then the setting's rate again.
+        public static int startFillLayers = 8;
+
         // Every frame in a raid, after the voxel world's own tick.
         public static void Tick(Camera cam)
         {
@@ -738,15 +742,26 @@ namespace TraceSix.Source
                 _between = GiConfig.Between.Value;
                 EmptyBetween();
             }
+            int redos = Ready ? 1 : Mathf.Max(1, startFillLayers / Slab);
+            for (int i = 0; i < redos; i++)
+            {
+                Redo(cam, lighter);
+                if (Ready) break;   // filled: the light comes on, the rest at the usual rate
+            }
+        }
+
+        private static void Redo(Camera cam, bool lighter)
+        {
             // Whose turn: while the volumes are first filling, the one in use that is furthest behind (so the
             // picture can start as soon as all are done twice, whatever their place in the round); then the round.
+            // The 1 m volume waits until the light is on: the lookups pass it by until it is filled.
             int c = -1;
             if (!Ready || (_between && _g[1].sweeps < 2))
             {
                 int least = int.MaxValue;
                 for (int k = 0; k < Levels; k++)
                 {
-                    if ((k == 1 && !_between) || _g[k].sweeps >= 2) continue;
+                    if ((k == 1 && (!_between || !Ready)) || _g[k].sweeps >= 2) continue;
                     int done = _g[k].sweeps * NZ + _g[k].layer;
                     if (done < least) { least = done; c = k; }
                 }
@@ -1723,7 +1738,7 @@ namespace TraceSix.Source
             for (int i = 0; i < n; i++) _indoorUsed[i] = false;
             for (int i = 0; i < MaxIndoor; i++) _indoorUsed[_indoorIdx[i]] = true;
             if (swapped > 0 && _indoorPicks++ > 0 && _indoorPicks <= 31)
-                Plugin.MyLog.LogInfo("[TraceSix] Interior volumes in use: " + swapped + " of " + MaxIndoor + " swapped for nearer ones; the farthest in use now begins "
+                Plugin.LogDetail("[TraceSix] Interior volumes in use: " + swapped + " of " + MaxIndoor + " swapped for nearer ones; the farthest in use now begins "
                     + Mathf.Max(0f, _indoorKey[MaxIndoor - 1]).ToString("F0") + " m from the camera, the nearest left out " + Mathf.Max(0f, _indoorKey[MaxIndoor]).ToString("F0") + " m.");
             if (swapped == 0) return;                                        // the same volumes as before: nothing to redo
             for (int i = 0; i < MaxIndoor; i++) _indoor[i] = _indoorAll[_indoorIdx[i]];
@@ -1824,7 +1839,7 @@ namespace TraceSix.Source
             int rows = Mathf.Max(1, (total + ListW - 1) / ListW);
             if (rows > ListMaxRows)
             {
-                Plugin.MyLog.LogInfo("[TraceSix] Interior volumes: no grid (" + total + " entries are more than it holds); every volume is asked.");
+                Plugin.LogDetail("[TraceSix] Interior volumes: no grid (" + total + " entries are more than it holds); every volume is asked.");
                 return;
             }
             _gridData = new float[GridN * GridN * 2];
@@ -1880,7 +1895,7 @@ namespace TraceSix.Source
             _indoorList.SetPixelData(_listData, 0);
             _indoorList.Apply(false, false);
             if (log)
-                Plugin.MyLog.LogInfo("[TraceSix] Interior volumes: a grid of " + GridN + " x " + GridN + " squares (" + (1f / sx).ToString("F1") + " x " + (1f / sz).ToString("F1")
+                Plugin.LogDetail("[TraceSix] Interior volumes: a grid of " + GridN + " x " + GridN + " squares (" + (1f / sx).ToString("F1") + " x " + (1f / sz).ToString("F1")
                     + " m) says which reach where - " + total + " entries, at most " + most + " volumes in one square, " + (100 * empty / (GridN * GridN)) + "% of squares with none; "
                     + tested + " test points answered as by asking all " + n + ".");
         }
@@ -2229,7 +2244,7 @@ namespace TraceSix.Source
             Shader.SetGlobalMatrixArray("_GiIndoor", _indoor);
             Shader.SetGlobalFloat("_GiIndoorCount", _indoorCount);
             IndoorIndex(true);
-            Plugin.MyLog.LogInfo("[TraceSix] Interior volumes: " + found + " objects, " + boxes + " of them plain boxes. " + split + " were several rooms in one mesh and are taken room by room ("
+            Plugin.LogDetail("[TraceSix] Interior volumes: " + found + " objects, " + boxes + " of them plain boxes. " + split + " were several rooms in one mesh and are taken room by room ("
                 + rooms + " rooms" + (largest != null ? "; the largest such mesh: " + largest : "") + "); " + whole + " other shapes count as the one box around them"
                 + (wholeWhy != null ? " - one of them was not taken apart: " + wholeWhy : "") + ". " + _indoorAll.Count + " volumes in all, "
                 + (_indoorAll.Count > MaxIndoor ? "the " + MaxIndoor + " nearest the camera" : "all") + " in use (room for " + MaxIndoor + ").");
@@ -2257,7 +2272,8 @@ namespace TraceSix.Source
                     if (l.type == LightType.Directional && (_sun == null || l.intensity > _sun.intensity)) _sun = l;
                 how = "by a scene search, " + sw.Elapsed.TotalMilliseconds.ToString("F1") + " ms";
             }
-            Plugin.MyLog.LogInfo(_sun != null ? "[TraceSix] Sun light: '" + _sun.name + "' (" + how + ")." : "[TraceSix] No sun light found: the volumes get sky light only.");
+            if (_sun != null) Plugin.LogDetail("[TraceSix] Sun light: '" + _sun.name + "' (" + how + ").");
+            else Plugin.MyLog.LogInfo("[TraceSix] No sun light found: the volumes get sky light only.");
         }
 
         private static void UpdateSun()
@@ -2277,6 +2293,8 @@ namespace TraceSix.Source
         {
             Vector4 sunDir = Shader.GetGlobalVector(IdSunDir), sunCol = Shader.GetGlobalVector(IdSunColor);
             Vector3 skyUp = SkyAmbientUp();
+            float bounceRemoved = GiSkyAmbient.BounceRemoved;
+            string skySource = GiSkyAmbient.Describe();
             AsyncGPUReadback.Request(volume, 0, 0, NX, Base(c), NY, NZ * 2, NZ, TextureFormat.RGBAHalf, req =>   // the +y block
             {
                 if (req.hasError) { Plugin.MyLog.LogWarning("[TraceSix] Light volume " + c + ": readback failed."); return; }
@@ -2296,12 +2314,13 @@ namespace TraceSix.Source
                     }
                 }
                 double lit = System.Math.Max(1, open - dark);
-                Plugin.MyLog.LogInfo("[TraceSix] Light volume " + c + " (" + CellSize[c] + " m cells): " + (100.0 * open / System.Math.Max(1, seen)).ToString("F0")
+                Plugin.LogDetail("[TraceSix] Light volume " + c + " (" + CellSize[c] + " m cells): " + (100.0 * open / System.Math.Max(1, seen)).ToString("F0")
                     + "% of cells open, " + (100.0 * dark / System.Math.Max(1, open)).ToString("F1") + "% of those get no light from above; the rest average ("
                     + Display(r / lit) + ", " + Display(g / lit) + ", " + Display(b / lit) + ") on upward surfaces. Sky ambient straight up ("
                     + skyUp.x.ToString("F3") + ", " + skyUp.y.ToString("F3") + ", " + skyUp.z.ToString("F3") + "); sun colour ("
                     + sunCol.x.ToString("F2") + ", " + sunCol.y.ToString("F2") + ", " + sunCol.z.ToString("F2") + "), "
-                    + (sunDir.w > 0.5f ? (Mathf.Asin(Mathf.Clamp(sunDir.y, -1f, 1f)) * Mathf.Rad2Deg).ToString("F0") + " deg above the horizon." : "off."));
+                    + (sunDir.w > 0.5f ? (Mathf.Asin(Mathf.Clamp(sunDir.y, -1f, 1f)) * Mathf.Rad2Deg).ToString("F0") + " deg above the horizon" : "off")
+                    + "; sky light from " + skySource + (GiSkyAmbient.FromCloudSix ? "" : ", its fake sun bounce taken out: " + bounceRemoved.ToString("F3")) + ".");
             });
         }
 
@@ -2312,7 +2331,7 @@ namespace TraceSix.Source
         internal static Vector3 SkyUp() => SkyAmbientUp();
         private static Vector3 SkyAmbientUp()
         {
-            Vector4 ar = Shader.GetGlobalVector("_SHAr"), ag = Shader.GetGlobalVector("_SHAg"), ab = Shader.GetGlobalVector("_SHAb"), sc = Shader.GetGlobalVector("_SHC");
+            Vector4 ar = GiSkyAmbient.Packed(0), ag = GiSkyAmbient.Packed(1), ab = GiSkyAmbient.Packed(2), sc = GiSkyAmbient.Packed(6);
             return new Vector3(Gamma(ar.y + ar.w - sc.x), Gamma(ag.y + ag.w - sc.y), Gamma(ab.y + ab.w - sc.z));
         }
 

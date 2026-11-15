@@ -21,6 +21,7 @@ namespace TraceSix.Source
         public static ConfigEntry<bool> Enabled;
         public static ConfigEntry<KeyboardShortcut> ToggleKey;
         public static ConfigEntry<float> Strength;
+        public static ConfigEntry<bool> SkyFromCloudSix;
         public static ConfigEntry<int> Reach, Layers;
         public static ConfigEntry<bool> Smooth, Between, Lamps, Moving, Scopes, VrSupport, OpenHoles, Glow;
         public static ConfigEntry<string> SkipMaps;
@@ -94,10 +95,16 @@ namespace TraceSix.Source
             ToggleKey = cfg.Bind(G, "Toggle Key", new KeyboardShortcut(UnityEngine.KeyCode.Insert), Basic(
                 "Switches Enabled off and on, to compare the picture with and without. Switched back on, the light fades "
                 + "in over about a second and a half.", 99));
-            Strength = cfg.Bind(G, "Strength", 1.5f, Basic(
+            Strength = cfg.Bind(G, "Strength", 1f, Basic(
                 "How bright the bounced light is. 1 = exactly what the game's own sun and sky give, which leaves shade and "
                 + "window-lit rooms darker than an eye would see them. Higher = rooms read more as they would to someone "
                 + "standing in them.", 98, new AcceptableValueRange<float>(0f, 3f)));
+            SkyFromCloudSix = cfg.Bind(G, "Sky Light From CloudSix", true, Basic(
+                "With CloudSix: the light from the sky comes from CloudSix's sky as you see it - its clouds, dusk and night - "
+                + "instead of the game's own ambient, which stays bright until the sun is well down and knows nothing of the "
+                + "clouds - at the brightness the sky is shown at. Needs CloudSix's SkyDome mode, custom sky and Publish Sky "
+                + "For Reflections; without them, or with this off, the game's ambient is used (its fake sun bounce taken out "
+                + "either way).", 97));
             Reach = cfg.Bind(G, "Detail Reach", 24, Basic(
                 "How far around you the finest (half-metre) light reaches, in metres. Beyond it coarser light takes over, "
                 + "which in large interiors can show as corners and walls brightening as you come up to them. 16 = closer in, "
@@ -160,17 +167,17 @@ namespace TraceSix.Source
                 + "a raid starts.", 55, new AcceptableValueRange<float>(0f, 5f)));
 
             //--- 2. Glass ------------------------------------------------------------------------------------
-            GlassSeeThrough = cfg.Bind(L, "See-Through Glass Windows", true, Basic(
+            GlassSeeThrough = cfg.Bind(L, "See-Through Glass Windows", false, Basic(
                 "Makes the glass-block windows the game draws as solid walls see-through: what is behind them shows "
                 + "through, blurred and tinted by the glass, while the mortar between the blocks stays solid. Off = the "
                 + "game's solid look.", 30));
-            GlassAlpha = cfg.Bind(L, "Glass Transparency", 0.4976526f, Basic(
+            GlassAlpha = cfg.Bind(L, "Glass Transparency", 0.5f, Basic(
                 "See-Through Glass Windows: how much of what is behind the glass shows through. 0 = the game's solid look, "
                 + "1 = only what is behind it (its reflections stay).", 29, new AcceptableValueRange<float>(0f, 1f)));
             GlassTint = cfg.Bind(L, "Glass Tint", 1f, Basic(
                 "See-Through Glass Windows: how much of the glass's own colour what is behind it (and the sunlight through "
                 + "it) takes. 0 = clear glass, 1 = the full colour.", 28, new AcceptableValueRange<float>(0f, 1f)));
-            GlassFrost = cfg.Bind(L, "Glass Frost", 0.4037559f, Basic(
+            GlassFrost = cfg.Bind(L, "Glass Frost", 0.4f, Basic(
                 "See-Through Glass Windows: how blurred what is seen through the glass is. 0 = clear, 1 = strongly frosted.", 27,
                 new AcceptableValueRange<float>(0f, 1f)));
 
@@ -270,7 +277,7 @@ namespace TraceSix.Source
                 + "which calms the fine shimmer the blur leaves. It may only differ from the frame's own light by about the "
                 + "grain, so a real change (a door, a lamp shot out) still shows at once. Off = each frame's denoised light "
                 + "as it is.", 23));
-            RtVoxNew = cfg.Bind(R, "Voxel Light For New Pixels", 4, Advanced(
+            RtVoxNew = cfg.Bind(R, "Voxel Light For New Pixels", 0, Advanced(
                 "Denoise: a surface that has just come into view (turning, walking backwards, a door opening) starts from the "
                 + "voxel light there, counted as this many frames, instead of from a single ray - the blotchy edges while you "
                 + "turn. The ray-traced light takes over as frames come in. Higher = smoother new areas, but they show the voxel "
@@ -282,7 +289,7 @@ namespace TraceSix.Source
                 "A denoiser built like NVIDIA's ReLAX: it tracks how much each pixel's light varies and keeps a lone bright "
                 + "speck from being smeared into a blotch. Off = the standard denoiser, which keeps bounce shadows with Keep "
                 + "Bounce Shadows.", 21));
-            RtShadowKeep = cfg.Bind(R, "Keep Bounce Shadows", 0.5f, Advanced(
+            RtShadowKeep = cfg.Bind(R, "Keep Bounce Shadows", 1f, Advanced(
                 "With Variance-Guided Denoising off: how much the blur keeps the shadows bounced light casts (under a table, "
                 + "behind a crate, in corners). 0 = none kept. Higher = crisper bounce shadows, a little more grain along "
                 + "walls and in corners.", 20, new AcceptableValueRange<float>(0f, 1f)));
@@ -412,8 +419,9 @@ namespace TraceSix.Source
                 "With Ray Tracing on, tick in a raid: writes to the log your character's meshes and what their vertex buffers "
                 + "hold, and whether this driver can share a buffer between the ray tracing and the game (unticks itself).", 5));
             DebugLog = cfg.Bind(D, "Debug Log", false, Advanced(
-                "Log every voxel volume rebuild (meshes, frames, time), now and then what the light volumes hold, and every "
-                + "300 frames the ray tracing's GPU time and video memory.", 4));
+                "Log each raid's set-up in detail (what was found, built and attached, the sky and cloud-shadow sources, a "
+                + "start-up report with the longest frames), every voxel volume rebuild (meshes, frames, time), now and then what "
+                + "the light volumes hold, and every 300 frames the ray tracing's GPU time and video memory.", 4));
 
             Tidy(cfg);
             cfg.SaveOnConfigSet = save;

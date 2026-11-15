@@ -49,7 +49,7 @@ namespace TraceSix.Source
                 _gameRead = true;
                 _game = GraphicsSettings.GetCustomShader(BuiltinShaderType.DeferredShading);
                 _gameMode = GraphicsSettings.GetShaderMode(BuiltinShaderType.DeferredShading);
-                Plugin.MyLog.LogInfo("[TraceSix] The game's deferred light pass: '" + (_game != null ? _game.name : "none") + "' (" + _gameMode + ").");
+                Plugin.LogDetail("[TraceSix] The game's deferred light pass: '" + (_game != null ? _game.name : "none") + "' (" + _gameMode + ").");
             }
             if (own)
             {
@@ -62,7 +62,7 @@ namespace TraceSix.Source
                 GraphicsSettings.SetShaderMode(BuiltinShaderType.DeferredShading, _gameMode);
             }
             _on = own;
-            Plugin.MyLog.LogInfo("[TraceSix] Light pass: " + (own ? "the lamps and the sun are drawn by TraceSix's copy of the game's light pass (Ray-Traced Direct Lamp Shadows)." : "the game's own draws them."));
+            Plugin.LogDetail("[TraceSix] Light pass: " + (own ? "the lamps and the sun are drawn by TraceSix's copy of the game's light pass (Ray-Traced Direct Lamp Shadows)." : "the game's own draws them."));
         }
 
         // The detail run's "lamps: no shadow maps": every point and spot light's shadow map off while it is measured (what the

@@ -239,6 +239,7 @@ namespace TraceSix.Source
                     if (sky.GetInstanceID() == _raidSky || sky.GetInstanceID() == _leftAlone) break;
                     yield return new WaitForSeconds(6f);   // late-streaming map pieces
                     if (sky == null || Camera.main == null || !RaidReady()) continue;
+                    LogRaidStartTest("wait loop, about to read the map");
                     // A map the mod is told to keep off: nothing is set up, and the game lights it as it does
                     // without the mod.
                     string map = MapId();
@@ -263,6 +264,7 @@ namespace TraceSix.Source
                         Plugin.MyLog.LogInfo("[TraceSix] This map has the game's simple sky (no TOD_Sky): its ambient is taken as the sky light, as on the open maps.");
                     GiProbes.FindSun(sky);
                     if (GiConfig.Enabled.Value) yield return StartCoroutine(SetUpRaid());
+                    else GiStartup.Begin(true);   // off: the raid start's frames only, the baseline for a hitch
                     break;
                 }
                 yield return new WaitForSeconds(i < 150 ? 2f : 5f);
@@ -292,7 +294,7 @@ namespace TraceSix.Source
             GiEmission.Reset();
             GiGlass.Restore(true);
             GiRt.EndRaid();
-            Plugin.MyLog.LogInfo("[TraceSix] The raid is over: the map's meshes, materials and lamps are let go of.");
+            Plugin.LogDetail("[TraceSix] The raid is over: the map's meshes, materials and lamps are let go of.");
             StartCoroutine(FreeUnused());
         }
 
@@ -349,6 +351,43 @@ namespace TraceSix.Source
             {
                 _rereads++;
                 _reread = StartCoroutine(ReadAgain(VoxelScene.SourceCount));
+            }
+        }
+
+        // The raid-start hook (GiRaidStartTestPatch) and the wait loop: the hook's time for the start-up report, and with
+        // Debug Log what is ready at that moment. Never throws: the hook runs inside the game's own raid start.
+        private static float _raidStartHookTime = -1f;
+        internal static float RaidStartHookTime => _raidStartHookTime;
+
+        internal static void LogRaidStartTest(string moment)
+        {
+            try
+            {
+                float now = Time.realtimeSinceStartup;
+                bool atHook = moment.StartsWith("OnGameStarted");
+                if (atHook)
+                    _raidStartHookTime = now;
+                if (!GiConfig.DebugLog.Value) return;   // the reading below searches every mesh in the scene
+                string sinceHook = _raidStartHookTime < 0f ? "no hook yet" : (now - _raidStartHookTime).ToString("F1") + " s after the hook";
+
+                EFT.GameWorld world = World();
+                string worldType = world != null ? world.GetType().Name : "none";
+                string map = world != null ? world.LocationId ?? "" : "";
+                bool player = world != null && world.MainPlayer != null;
+                Object sky = FindSky();
+                Camera mainCamera = Camera.main;
+
+                int meshes = FindObjectsOfType<MeshRenderer>().Length;
+                int terrains = Terrain.activeTerrains.Length;
+
+                Plugin.LogDetail("[TraceSix] Raid start test, " + moment + ": game time " + now.ToString("F1") + " s (" + sinceHook + "); world " + worldType
+                    + ", map '" + map + "', player " + (player ? "yes" : "no") + ", sky " + (sky != null ? sky.GetType().Name : "none")
+                    + ", camera " + (mainCamera != null ? mainCamera.name : "none") + ", " + meshes + " active meshes, " + terrains + " terrains, "
+                    + SceneManager.sceneCount + " scenes, ready for the loop's check: " + (RaidReady() && sky != null && mainCamera != null ? "yes" : "no") + ".");
+            }
+            catch (System.Exception e)
+            {
+                Plugin.MyLog.LogWarning("[TraceSix] Raid start test, " + moment + ": " + e.Message);
             }
         }
 

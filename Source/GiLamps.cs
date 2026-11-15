@@ -157,7 +157,7 @@ namespace TraceSix.Source
             if (m > _rtMoveLogged)
             {
                 _rtMoveLogged = m;
-                Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: " + m + " moving light" + (m == 1 ? "" : "s") + " lit by the traced rays now (room for " + MaxFlash
+                Plugin.LogDetail("[TraceSix] Ray tracing: " + m + " moving light" + (m == 1 ? "" : "s") + " lit by the traced rays now (room for " + MaxFlash
                     + "); the nearest '" + _rtMove[0].light.name + "' " + (_rtMove[0].pos - cam).magnitude.ToString("F1") + " m from the camera.");
             }
             return n + m;
@@ -376,7 +376,7 @@ namespace TraceSix.Source
             _collected = true;
             ranges.Sort();
             powers.Sort();
-            Plugin.MyLog.LogInfo("[TraceSix] Lamps: " + point + " point and " + spot + " spot lights in the map, " + faders + " of them faded by distance by the game. "
+            Plugin.LogDetail("[TraceSix] Lamps: " + point + " point and " + spot + " spot lights in the map, " + faders + " of them faded by distance by the game. "
                 + on + " are lit (whatever the distance); the game shows " + shown + " of all lights right now (" + cookie + " with a cookie, " + shadows + " casting shadows)."
                 + (on > 0 ? " Of the lit ones - range: median " + ranges[on / 2].ToString("F1") + " m, largest " + ranges[on - 1].ToString("F1")
                     + " m; intensity: median " + powers[on / 2].ToString("F2") + ", largest " + powers[on - 1].ToString("F2") + "." : "")
@@ -384,7 +384,7 @@ namespace TraceSix.Source
                 + fillsOn + " the game's own fill lights by name (...GI; " + fills + " in the map): " + (GiConfig.Fills.Value ? "bounced like any lamp (the setting)."
                     : standIns + " of them bounced, being all that is lit of their lamp (its real light switched off by the game), the rest not.")
                 + " The game works in " + QualitySettings.activeColorSpace + " colour space.");
-            Plugin.MyLog.LogInfo("[TraceSix] Lamps in a fixture: for " + _started + " spots the light starts at the far side of the lamp's own fixture, not at the game's Light above it (never more than 3 m or a third of its reach along).");
+            Plugin.LogDetail("[TraceSix] Lamps in a fixture: for " + _started + " spots the light starts at the far side of the lamp's own fixture, not at the game's Light above it (never more than 3 m or a third of its reach along).");
         }
 
         private static void Read(Lamp k)
@@ -454,7 +454,7 @@ namespace TraceSix.Source
                         if (_flickLogged < 10 && Camera.main != null && (k.pos - Camera.main.transform.position).sqrMagnitude < 900f)
                         {
                             _flickLogged++;
-                            Plugin.MyLog.LogInfo("[TraceSix] A lamp is flickering or fading: '" + k.name + "' at " + k.pos.ToString("F1")
+                            Plugin.LogDetail("[TraceSix] A lamp is flickering or fading: '" + k.name + "' at " + k.pos.ToString("F1")
                                 + " - its light is now read every frame and eased over " + FlickerTime + " s.");
                         }
                     }
@@ -558,7 +558,7 @@ namespace TraceSix.Source
             string done = GiProbes.WakeLamp(k.pos, k.range);
             if (done == null || _wokeLogged >= 20) return;
             _wokeLogged++;
-            Plugin.MyLog.LogInfo("[TraceSix] A lamp " + what + ": '" + k.name + "' at " + k.pos.ToString("F1") + ", reach " + k.range.ToString("F1")
+            Plugin.LogDetail("[TraceSix] A lamp " + what + ": '" + k.name + "' at " + k.pos.ToString("F1") + ", reach " + k.range.ToString("F1")
                 + " m - " + done + ".");
         }
 
@@ -658,7 +658,7 @@ namespace TraceSix.Source
             // The first time a moving light is followed, and whenever more are than ever before in this raid.
             if (n <= _flashLogged || _flash[0] == null) return;
             _flashLogged = n;
-            Plugin.MyLog.LogInfo("[TraceSix] Moving lights: " + n + " followed now (room for " + MaxFlash + "), of " + _moving.Count
+            Plugin.LogDetail("[TraceSix] Moving lights: " + n + " followed now (room for " + MaxFlash + "), of " + _moving.Count
                 + " lights known to move; the nearest is " + (_flash[0].pos - cam.transform.position).magnitude.ToString("F1") + " m from the camera.");
         }
 
@@ -867,7 +867,7 @@ namespace TraceSix.Source
             _logged++;
             int close = 0;
             for (int i = 0; i < n; i++) if (_bestKey[i] < 30f) close++;
-            Plugin.MyLog.LogInfo("[TraceSix] Lamps in use: " + n + " of the " + lit + " lit, still ones (room for " + Max + "); " + close
+            Plugin.LogDetail("[TraceSix] Lamps in use: " + n + " of the " + lit + " lit, still ones (room for " + Max + "); " + close
                 + " of them reach to within 30 m of the camera" + (n > 0 ? ", the farthest ends " + Mathf.Max(0f, _bestKey[n - 1]).ToString("F0") + " m away" : "")
                 + "; " + moving + " lit lights move (Moving Lights follows the nearest spots among them).");
         }

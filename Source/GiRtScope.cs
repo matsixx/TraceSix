@@ -135,7 +135,7 @@ namespace TraceSix.Source
             }
             if (_mat == null)
             {
-                _mat = new Material(GiAssets.Probes) { hideFlags = HideFlags.DontSave };
+                _mat = GiSkyAmbient.NewProbesMaterial();
                 _passSunRays = _mat.FindPass("RTSUNRAYS");
                 _passSunTemporal = _mat.FindPass("RTSUNTEMPORAL");
                 _passSunApply = _mat.FindPass("RTSUNAPPLY");
@@ -237,7 +237,7 @@ namespace TraceSix.Source
             if (!_said)
             {
                 _said = true;
-                Plugin.MyLog.LogInfo("[TraceSix] Ray tracing: the scope '" + _cam.name + "' traces its own sun rays (" + _sunO.width + "x" + _sunO.height
+                Plugin.LogDetail("[TraceSix] Ray tracing: the scope '" + _cam.name + "' traces its own sun rays (" + _sunO.width + "x" + _sunO.height
                     + " rays for its " + w + "x" + h + " picture) into its shadow mask" + (far != null ? " and EFT's distant-shadow mask for it." : "."));
             }
             _hadSun = true;

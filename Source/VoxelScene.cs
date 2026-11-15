@@ -91,6 +91,11 @@ namespace TraceSix.Source
         // hanging truss, a lamp post). No wall, floor or roof is under a LampController.
         private static readonly HashSet<int> _lampIds = new HashSet<int>();
         private static int _lampFixtures;
+        // A road the game splits into generated pieces ('road[i]  lod[j]' children): RoadSplineGenerator.Generate switches the
+        // road's own mesh off (enabled = !SplitForLods), but it stays a few cm under the pieces. Listed (textured meshes go in
+        // switched on or off), the rays starting on the road met its two-sided underside: black blotches round the player.
+        private static readonly HashSet<int> _replacedRoads = new HashSet<int>();
+        private static int _nReplacedRoads;
         private static readonly Dictionary<int, int> _taken = new Dictionary<int, int>();   // renderer -> 1 fine, 2 coarse (for the log)
         private static float _doorLookAt, _doorRestAt;
         private static Vector3 _doorAt;        // a door that has moved since the fine volume was built
@@ -188,6 +193,8 @@ namespace TraceSix.Source
             _doorIds.Clear();
             _lampIds.Clear();
             _lampFixtures = 0;
+            _replacedRoads.Clear();
+            _nReplacedRoads = 0;
             _taken.Clear();
             _doorRebuilds = _doorsOut = 0;
             _rbForDoor = false;
@@ -271,6 +278,7 @@ namespace TraceSix.Source
                 foreach (MeshRenderer r in comp.GetComponentsInChildren<MeshRenderer>(true)) _lampIds.Add(r.GetInstanceID());
                 if (_lampIds.Count > before) _lampFixtures++;
             }
+            FindReplacedRoads();
             FindStandIns();
             GiStartup.Note("the doors, lamps and stand-ins");
             yield return null;
@@ -306,19 +314,33 @@ namespace TraceSix.Source
             }
             _collected = true;
             _collecting = false;
-            Plugin.MyLog.LogInfo("[TraceSix] Doors: " + doorCount + " found; " + _doors.Count + " of their meshes are voxelised where the door is at the time, not where it was at raid start.");
-            Plugin.MyLog.LogInfo("[TraceSix] Lamp fixtures: " + _lampFixtures + " of the game's lamps have meshes of their own (" + _lampIds.Count + " meshes); "
+            Plugin.LogDetail("[TraceSix] Doors: " + doorCount + " found; " + _doors.Count + " of their meshes are voxelised where the door is at the time, not where it was at raid start.");
+            Plugin.LogDetail("[TraceSix] Lamp fixtures: " + _lampFixtures + " of the game's lamps have meshes of their own (" + _lampIds.Count + " meshes); "
                 + (GiConfig.LampFixtures.Value ? "they are IN the voxel world (Lamp Fixtures In The Voxel World is on)."
                                                : "they are left out of the voxel world, so a lamp neither lights nor is hidden by its own fixture."));
-            Plugin.MyLog.LogInfo("[TraceSix] Voxel sources: " + _cands.Count + " meshes (" + groups + " LOD groups: " + (GiConfig.CoarseFull.Value ? "full detail for every volume" : "full detail for the fine volume, a simpler level for the others") + "), collected in "
+            Plugin.LogDetail("[TraceSix] Voxel sources: " + _cands.Count + " meshes (" + groups + " LOD groups: " + (GiConfig.CoarseFull.Value ? "full detail for every volume" : "full detail for the fine volume, a simpler level for the others") + "), collected in "
                 + ((Time.realtimeSinceStartup - t0) * 1000f).ToString("F0") + " ms of wall time. " + _nCulledIn
                 + " of them were switched off by the game's culling at this moment. " + _nHighPoly + " are on the 'HighPolyCollider' layer (visible geometry that is also collision: taken since 0.15.6).");
-            Plugin.MyLog.LogInfo("[TraceSix] Source materials (per submesh): plain " + _nPlain + ", painted 3-layer " + _nPaint + ", painted decal " + _nDecal
+            Plugin.LogDetail("[TraceSix] Source materials (per submesh): plain " + _nPlain + ", painted 3-layer " + _nPaint + ", painted decal " + _nDecal
                 + ", glowing with no colour texture (taken for their glow) " + _nGlowPlain + ", no colour texture (taken by their colour) " + _nTintOnly
                 + " [" + Top(_tintOnlyShaders, 8) + "]. Skipped: " + _nUntexturedMeshes + " never-drawn helpers with no colour texture [" + Top(_untexturedShaders, 8) + "], " + _nGlass + " glass. '"
                 + "CullingMask' layer: " + _nCullLayer + " meshes, " + _nCullLayerTextured + " textured [" + Top(_cullLayerShaders, 6) + "]; "
                 + (GiConfig.CullLayer.Value ? _nCullIn + " of them voxelised" : "none voxelised (Voxelise Culling-Layer Geometry is off)")
-                + ", " + _nStandIn + " left out as far-view stand-ins (" + _standIns.Count + " such meshes in the map).");
+                + ", " + _nStandIn + " left out as far-view stand-ins (" + _standIns.Count + " such meshes in the map), "
+                + _nReplacedRoads + " left out as roads the game draws as generated pieces (" + _replacedRoads.Count + " such roads in the map).");
+        }
+
+        private static void FindReplacedRoads()
+        {
+            foreach (RoadSplineGenerator g in Resources.FindObjectsOfTypeAll<RoadSplineGenerator>())
+            {
+                if (g == null || !g.gameObject.scene.IsValid() || !g.SplitForLods) continue;
+                bool hasPieces = false;
+                foreach (Transform child in g.transform)
+                    if (child.name.StartsWith("road[") && child.GetComponent<MeshRenderer>() != null) { hasPieces = true; break; }
+                MeshRenderer own = g.GetComponent<MeshRenderer>();
+                if (hasPieces && own != null) _replacedRoads.Add(own.GetInstanceID());
+            }
         }
 
         // The game lights its interiors with hand-placed markers at doors and windows (AnalyticSource objects,
@@ -354,7 +376,7 @@ namespace TraceSix.Source
                               .Append(": half size ").Append(door.ToString("F2")).Append(", cube scale ").Append(scale.ToString("F2")).Append(" shift ").Append(shift.ToString("F2"))
                               .Append(", object scale ").Append(comp.transform.lossyScale.ToString("F2")).Append(", '").Append(comp.name).Append('\'');
                 }
-                Plugin.MyLog.LogInfo("[TraceSix] Door/window markers: " + _holes.Count + " openings will be kept free of voxels (" + (GiConfig.OpenHoles.Value ? "on" : "switched off") + "), "
+                Plugin.LogDetail("[TraceSix] Door/window markers: " + _holes.Count + " openings will be kept free of voxels (" + (GiConfig.OpenHoles.Value ? "on" : "switched off") + "), "
                     + off + " of them in places the game's culling has switched off for now. The first few:" + sample);
             }
             catch (System.Exception e) { Plugin.MyLog.LogWarning("[TraceSix] Door/window markers failed: " + e.GetType().Name + ": " + e.Message); }
@@ -402,6 +424,7 @@ namespace TraceSix.Source
             GameObject go = r.gameObject;
             // Part of the level: active, or switched off only by the game's culling for where the player is now.
             if (!go.scene.IsValid() || !GiCulling.Present(go)) return;
+            if (_replacedRoads.Contains(r.GetInstanceID())) { _nReplacedRoads++; return; }
             // Not a lamp's own fixture (_lampIds).
             if (!GiConfig.LampFixtures.Value && _lampIds.Contains(r.GetInstanceID())) return;
             // Default + Terrain = the visible world. Not triggers, loot, sky. 'HighPolyCollider' is taken as well
@@ -737,8 +760,7 @@ namespace TraceSix.Source
                 int door = DoorMoved(cp, true);
                 if (door > 0)
                 {
-                    if (GiConfig.DebugLog.Value || _doorRebuilds < 6)
-                        Plugin.MyLog.LogInfo(door == 1
+                    Plugin.LogDetail(door == 1
                             ? "[TraceSix] A door near the camera has begun to move: the fine voxel volume is rebuilt without it until it is still."
                             : "[TraceSix] A door near the camera has moved: the fine voxel volume is rebuilt with it where it is now.");
                     _doorRebuilds++;
@@ -922,10 +944,14 @@ namespace TraceSix.Source
             _boxCount = _cands.Count;
         }
 
+        // Meshes drawn a frame while the light is not on yet (raid start, or after a refill): the volumes are what it waits
+        // for, so fewer, heavier frames - mostly under the loading screen. Then "Voxel Draws Per Frame" again.
+        public static int startUpDrawBudget = 2000;
+
         private static void ContinueRebuild()
         {
             Level lv = _lv[_rbLevel];
-            int l = _rbLevel, budget = GiConfig.DrawBudget.Value, drawn = 0;
+            int l = _rbLevel, budget = GiProbes.Ready ? GiConfig.DrawBudget.Value : Mathf.Max(GiConfig.DrawBudget.Value, startUpDrawBudget), drawn = 0;
             _cb.Clear();
             BindWrite(lv.nextOrigin, VoxelSize[l]);
             while (_rbIdx < _rbList.Count && drawn < budget)
@@ -1040,7 +1066,7 @@ namespace TraceSix.Source
             _rbLevel = -1;
             if (GiConfig.DebugLog.Value || _builds < Levels)
             {
-                Plugin.MyLog.LogInfo("[TraceSix] Voxel volume " + l + " (" + VoxelSize[l] + " m voxels, " + (Res * VoxelSize[l]) + " m across) built: "
+                Plugin.LogDetail("[TraceSix] Voxel volume " + l + " (" + VoxelSize[l] + " m voxels, " + (Res * VoxelSize[l]) + " m across) built: "
                     + _rbList.Count + " meshes, " + _rbDraws + " draws over " + _rbFrames + " frames, "
                     + ((Time.realtimeSinceStartup - _rbStart) * 1000f).ToString("F0") + " ms of wall time, "
                     + _voxMats.Count + " materials (" + _blackColors + " with a black tint, treated as unused)."
@@ -1073,7 +1099,7 @@ namespace TraceSix.Source
                     }
                 }
                 total = System.Math.Max(1, total);
-                Plugin.MyLog.LogInfo("[TraceSix] Voxel volume " + l + " contents: " + (100.0 * any / total).ToString("F2") + "% of voxels hold something; "
+                Plugin.LogDetail("[TraceSix] Voxel volume " + l + " contents: " + (100.0 * any / total).ToString("F2") + "% of voxels hold something; "
                     + (100.0 * solid / System.Math.Max(1, any)).ToString("F0") + "% of those stop a ray along every axis.");
             });
         }

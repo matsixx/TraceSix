@@ -74,7 +74,9 @@ namespace TraceSix.Source
             }
             if (Voxelize != null && Probes == null)
                 Plugin.MyLog.LogError("[TraceSix] The tracesix bundle has no probe shader (it is older than this DLL): the voxel world builds, the lighting does not change. Rebuild the bundle.");
-            Plugin.MyLog.LogInfo("[TraceSix] Shaders: voxelize=" + (Voxelize != null) + " debug=" + (Debug != null && Debug.isSupported) + " probes=" + (Probes != null) + " light pass=" + (Light != null) + " glass=" + (Glass != null));
+            string shaders = "[TraceSix] Shaders: voxelize=" + (Voxelize != null) + " debug=" + (Debug != null && Debug.isSupported) + " probes=" + (Probes != null) + " light pass=" + (Light != null) + " glass=" + (Glass != null);
+            if (Voxelize != null && Probes != null && Light != null && Glass != null) Plugin.LogDetail(shaders);
+            else Plugin.MyLog.LogInfo(shaders);
             return Voxelize != null;
         }
 
@@ -118,7 +120,7 @@ namespace TraceSix.Source
             cb.Release();
             _warmKeep.Add(rt);
             _warmKeep.Add(tri);
-            Plugin.MyLog.LogInfo("[TraceSix] Shaders made ready ahead of the raid: " + passes + " passes in " + sw.ElapsedMilliseconds + " ms (main thread; the driver may take a little longer).");
+            Plugin.LogDetail("[TraceSix] Shaders made ready ahead of the raid: " + passes + " passes in " + sw.ElapsedMilliseconds + " ms (main thread; the driver may take a little longer).");
         }
 
         // The warm-up's own objects, a few frames later (the draws hold them until then).

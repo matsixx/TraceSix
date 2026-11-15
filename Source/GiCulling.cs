@@ -37,7 +37,7 @@ namespace TraceSix.Source
                 }
             }
             catch (System.Exception e) { Plugin.MyLog.LogWarning("[TraceSix] Culling lists failed: " + e.GetType().Name + ": " + e.Message); }
-            Plugin.MyLog.LogInfo("[TraceSix] Culling: " + Cullers + " of the game's culling zones and distance cullers found; between them they deactivate "
+            Plugin.LogDetail("[TraceSix] Culling: " + Cullers + " of the game's culling zones and distance cullers found; between them they deactivate "
                 + _objects.Count + " objects and disable " + _components.Count + " components when the player is elsewhere.");
         }
 
