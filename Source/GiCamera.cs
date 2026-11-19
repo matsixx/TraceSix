@@ -20,6 +20,8 @@ namespace TraceSix.Source
     internal class GiCamera : MonoBehaviour
     {
         public bool Scope;
+        // (API) a camera another mod owns (TraceSixApi.AttachTo): a scope's pass, but on whatever "Indirect Light In Scopes" says
+        public bool External;
         private bool _said;
         private Camera _cam;
         private CommandBuffer _cbLight, _cbView, _cbEye;
@@ -84,7 +86,7 @@ namespace TraceSix.Source
 
         private void OnPreRender()
         {
-            bool wanted = GiConfig.On && GiProbes.Ready && GiAssets.Probes != null && (!Scope || GiConfig.Scopes.Value);
+            bool wanted = GiConfig.On && GiProbes.Ready && GiAssets.Probes != null && (!Scope || External || GiConfig.Scopes.Value);
             bool stereo = _cam.stereoEnabled;
             bool on = wanted && (!stereo || (!Scope && GiConfig.VrSupport.Value)) && _cam.allowHDR && _cam.actualRenderingPath == RenderingPath.DeferredShading;
             if (!on)
@@ -160,7 +162,7 @@ namespace TraceSix.Source
                 else GiStartup.LightOn();
                 // A scope's camera is switched on and off with every aim: said the first time only.
                 if (!Scope || !_said)
-                    Plugin.LogDetail("[TraceSix] Probe light attached to '" + _cam.name + "'" + (Scope ? " (the scope)" : "") + " at " + LightEvt + " (" + w + "x" + h
+                    Plugin.LogDetail("[TraceSix] Probe light attached to '" + _cam.name + "'" + (External ? " (another mod's camera)" : Scope ? " (the scope)" : "") + " at " + LightEvt + " (" + w + "x" + h
                         + (smooth ? ", smoothed at " + qw + "x" + qh + (fast ? ", looked up at that size" : ", looked up for every pixel") : ", not smoothed") + ").");
                 _said = true;
             }
